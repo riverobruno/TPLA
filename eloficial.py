@@ -43,7 +43,7 @@ ldr = analogio.AnalogIn(board.A1)
 
 # Salida PWM al láser
 laser = pwmio.PWMOut(board.GP14, frequency=5000, duty_cycle=0)
-buzzer = pwmio.PWMOut(board.GP15, duty_cycle=0, frequency=440, variable_frequency=True)
+buzzer = pwmio.PWMOut(board.GP10, duty_cycle=0, frequency=440, variable_frequency=True)
 def read_analog(pin):
     # Retorna valor 0-65535
     return pin.value
@@ -54,32 +54,37 @@ def beep(frequency, duration):
     time.sleep(duration)
     buzzer.duty_cycle = 0      # apagar
     time.sleep(0.05)
-    
 while True:
-    pot_value = read_analog(pot)
-    ldr_value = read_analog(ldr)
-    
-    if (ldr_value)>300:
-        for n in range (5):
-            beep(440, 0.5)  # La
-            beep(880, 0.5)  # La más agudo
-            beep(660, 0.5)
+    ## Estado 0: Espera potenciómetro > 1100, todo apagado
+    while True:
+        pot_value = read_analog(pot)
+        ldr_value = read_analog(ldr)
+        if (pot_value)>1100:
+            break
+        display_number(0)
+        duty = int(pot_value * (1 - ldr_value / 65535))
+        laser.duty_cycle = duty
+    while True:
+        pot_value = read_analog(pot)
+        ldr_value = read_analog(ldr)
+        if (pot_value)<1100:
+            break
         
 
-    # Normalizamos LDR a factor entre 0 y 1
-    ldr_factor = ldr_value / 65535
-    
-    # Ajustamos el duty_cycle según potenciómetro y LDR
-    # LDR alto (mucha luz) reduce intensidad del láser
-    duty = int(pot_value * (1 - ldr_factor))
-    laser.duty_cycle = duty
-    
-    print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
-    display_number(7)
-    time.sleep(0.1)
-
-
-"""while True:
-    for n in range(10):
+        if (ldr_value)>150:
+            display_number(2)
+            for n in range (5):
+                beep(440, 0.5)  # La
+        else:
+            display_number(1)
+            
+        # Normalizamos LDR a factor entre 0 y 1
+        ldr_factor = ldr_value / 65535
         
-        time.sleep(1)"""
+        # Ajustamos el duty_cycle según potenciómetro y LDR
+        # LDR alto (mucha luz) reduce intensidad del láser
+        duty = int(pot_value * (1 - ldr_factor))
+        laser.duty_cycle = duty
+        
+        print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
+        time.sleep(0.1)
