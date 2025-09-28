@@ -1,6 +1,8 @@
 import board
 import digitalio
 import time
+import usb_cdc
+
 
 # Configurar pines de los segmentos
 segments = []
@@ -44,6 +46,8 @@ ldr = analogio.AnalogIn(board.A1)
 # Salida PWM al láser
 laser = pwmio.PWMOut(board.GP14, frequency=5000, duty_cycle=0)
 buzzer = pwmio.PWMOut(board.GP10, duty_cycle=0, frequency=440, variable_frequency=True)
+paratemp={"bandera":False,"temporizador":0,"contador":0}
+
 def read_analog(pin):
     # Retorna valor 0-65535
     return pin.value
@@ -54,6 +58,24 @@ def beep(frequency, duration):
     time.sleep(duration)
     buzzer.duty_cycle = 0      # apagar
     time.sleep(0.05)
+
+def vertemporizador():#Todo esto del diccionario lo hice para hacer una especie de procedimiento sin definir dentro las variables globales
+    if usb_cdc.console.in_waiting > 0:  # hay datos disponibles
+        # Leer una línea completa (terminada en '\n')
+        msg = usb_cdc.console.readline().decode("utf-8").strip()
+        if msg.isdigit():
+            paratemp["bandera"] = True
+            display_number(3)
+            paratemp["temporizador"] =2*(int(msg))
+            paratemp["contador"] = 0
+        else:
+            print("entrada no válida")
+    if paratemp["bandera"]:
+        paratemp["contador"] += 1
+        print(paratemp["contador"]) # 2 porque cada ciclo es 0.5s y la entrada es en segundos
+        if paratemp["contador"] >= paratemp["temporizador"]:
+            paratemp["bandera"] = False
+
 while True:
     ## Estado 0: Espera potenciómetro > 1100, todo apagado
     while True:
@@ -62,29 +84,38 @@ while True:
         if (pot_value)>1100:
             break
         display_number(0)
-        duty = int(pot_value * (1 - ldr_value / 65535))
-        laser.duty_cycle = duty
+        print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
+        if usb_cdc.console.in_waiting > 0:
+            print("El sistema está apagado, gire el potenciómetro para programar la temporización")
+        time.sleep(0.5)
+        
     while True:
         pot_value = read_analog(pot)
-        ldr_value = read_analog(ldr)
+        
+        
         if (pot_value)<1100:
             break
+        vertemporizador()
         
-
-        if (ldr_value)>150:
-            display_number(2)
-            for n in range (5):
-                beep(440, 0.5)  # La
-        else:
-            display_number(1)
+        if not paratemp["bandera"]:
             
-        # Normalizamos LDR a factor entre 0 y 1
-        ldr_factor = ldr_value / 65535
-        
-        # Ajustamos el duty_cycle según potenciómetro y LDR
-        # LDR alto (mucha luz) reduce intensidad del láser
-        duty = int(pot_value * (1 - ldr_factor))
-        laser.duty_cycle = duty
-        
+            # Ajustamos el duty_cycle según potenciómetro y LDR
+            # LDR alto (mucha luz) reduce intensidad del láser
+            duty = int(pot_value)
+            laser.duty_cycle = duty
+            time.sleep(0.1)  # Pequeña pausa para estabilizar lectura
+            ldr_value = read_analog(ldr)
+            if (ldr_value)>150:
+                display_number(2)
+                for n in range (5):
+                    beep(440, 0.5)
+                    print("je")
+                    
+            else:
+                display_number(1)
+                
+            
+        else:
+            laser.duty_cycle = 0
         print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
-        time.sleep(0.1)
+        time.sleep(0.5)
