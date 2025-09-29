@@ -4,7 +4,10 @@ import time
 import usb_cdc
 import analogio
 import pwmio
-
+import wifi
+import socketpool
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
+import json
 led = digitalio.DigitalInOut(board.GP6)
 led.direction = digitalio.Direction.OUTPUT
 
@@ -50,6 +53,59 @@ laser = pwmio.PWMOut(board.GP14, frequency=5000, duty_cycle=0)
 buzzer = pwmio.PWMOut(board.GP10, duty_cycle=0, frequency=440, variable_frequency=True)
 paratemp={"bandera":False,"temporizador":0,"contador":0}
 
+
+# Configuración de RED
+SSID = "Tu wifi"
+PASSWORD = "Contraseña de tu wifi"
+BROKER = "La IPv4 de la pc donde corre mosquitto. Win: ipconfig o Linux: ip addr"  
+NOMBRE_EQUIPO = "Actuadores"
+DESCOVERY_TOPIC = "descubrir"
+TOPIC = f"sensores/{NOMBRE_EQUIPO}"
+
+print(f"Intentando conectar a {SSID}...")
+try:
+    wifi.radio.connect(SSID, PASSWORD)
+    print(f"Conectado a {SSID}")
+    print(f"Dirección IP: {wifi.radio.ipv4_address}")
+except Exception as e:
+    print(f"Error al conectar a WiFi: {e}")
+    while True:
+        pass 
+
+# Configuración MQTT 
+pool = socketpool.SocketPool(wifi.radio)
+
+def connect(client, userdata, flags, rc):
+    print("Conectado al broker MQTT")
+    client.publish(DESCOVERY_TOPIC, json.dumps({"equipo":NOMBRE_EQUIPO,"magnitudes": ["posición", "inclinación"]}))
+
+mqtt_client = MQTT.MQTT(
+    broker=BROKER,
+    port=1883,
+    socket_pool=pool
+)
+
+mqtt_client.on_connect = connect
+mqtt_client.connect()
+
+# Usamos estas varaibles globales para controlar cada cuanto publicamos
+LAST_PUB = 0
+PUB_INTERVAL = 5  
+def publish():
+    global last_pub,pot_value,inclinado
+    now = time.monotonic()
+   
+    if now - last_pub >= PUB_INTERVAL:
+        try:
+            pos_topic = f"{TOPIC}/posición" 
+            mqtt_client.publish(pos_topic, str(pot_value))
+            inclina_topic = f"{TOPIC}/inclinación" 
+            mqtt_client.publish(inclina_topic, str(inclinado))
+            
+            last_pub = now
+          
+        except Exception as e:
+            print(f"Error publicando MQTT: {e}")
 def read_analog(pin):
     # Retorna valor 0-65535
     return pin.value
@@ -88,10 +144,12 @@ while True:
             led.value = True
         else:
             led.value = False
+        inclinado=led.value
         if (pot_value)>1100:
             break
         display_number(0)
         print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
+        publish()
         if usb_cdc.console.in_waiting > 0:
             print("El sistema está apagado, gire el potenciómetro para programar la temporización")
         time.sleep(0.5)
@@ -102,6 +160,7 @@ while True:
             led.value = True
         else:
             led.value = False
+        inclinado=led.value
         if (pot_value)<1100:
             break
         vertemporizador()
@@ -127,4 +186,5 @@ while True:
         else:
             laser.duty_cycle = 0
         print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
+        publish()
         time.sleep(0.5)
