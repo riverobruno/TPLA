@@ -2,7 +2,16 @@ import board
 import digitalio
 import time
 import usb_cdc
+import analogio
+import pwmio
 
+led = digitalio.DigitalInOut(board.GP6)
+led.direction = digitalio.Direction.OUTPUT
+
+# Sensor (tilt switch) en GP11
+sensor = digitalio.DigitalInOut(board.GP11)
+sensor.direction = digitalio.Direction.INPUT
+sensor.pull = digitalio.Pull.UP
 
 # Configurar pines de los segmentos
 segments = []
@@ -31,13 +40,6 @@ numbers = [
 def display_number(num):
     for i in range(7):
         segments[i].value = numbers[num][i]
-
-
-
-
-import analogio
-import pwmio
-
 
 # Entradas analógicas
 pot = analogio.AnalogIn(board.A0)
@@ -76,23 +78,30 @@ def vertemporizador():#Todo esto del diccionario lo hice para hacer una especie 
         if paratemp["contador"] >= paratemp["temporizador"]:
             paratemp["bandera"] = False
 
+
 while True:
     ## Estado 0: Espera potenciómetro > 1100, todo apagado
     while True:
         pot_value = read_analog(pot)
         ldr_value = read_analog(ldr)
+        if not sensor.value:  # sensor activado
+            led.value = True
+        else:
+            led.value = False
         if (pot_value)>1100:
             break
         display_number(0)
-        print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
+        print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
         if usb_cdc.console.in_waiting > 0:
             print("El sistema está apagado, gire el potenciómetro para programar la temporización")
         time.sleep(0.5)
         
     while True:
         pot_value = read_analog(pot)
-        
-        
+        if not sensor.value:  # sensor activado
+            led.value = True
+        else:
+            led.value = False
         if (pot_value)<1100:
             break
         vertemporizador()
@@ -117,5 +126,5 @@ while True:
             
         else:
             laser.duty_cycle = 0
-        print(f"Pot: {pot_value}, LDR: {ldr_value}, Duty: {duty}")
+        print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
         time.sleep(0.5)
