@@ -134,6 +134,40 @@ def vertemporizador():#Todo esto del diccionario lo hice para hacer una especie 
         if paratemp["contador"] >= paratemp["temporizador"]:
             paratemp["bandera"] = False
 
+def angulo_potenciometro(valor_adc):
+    """
+    Convierte el valor ADC del potenciómetro a ángulos (0-180 grados)
+    
+    Args:
+        valor_adc (int): Valor ADC del potenciómetro (0 a 65535)
+    
+    Returns:
+        float: Ángulo en grados (0.0 a 180.0)
+    """
+    # Normalizar el valor de 0-65535 a 0-360 grados
+    angulo = (valor_adc / 65535) * 180
+    return round(angulo, 1)
+
+def intensidad_fotorresistor(valor_adc, valor_min=0, valor_max=65536):
+    """
+    Convierte el valor ADC del fotoresistor KY-018 a porcentaje de luz
+    
+    NOTA: El fotoresistor disminuye su valor cuando recibe más luz
+    
+    Args:
+        valor_adc (int): Valor ADC del fotoresistor (0 a 65535)
+        valor_min (int): Valor mínimo con mucha luz (por defecto 0)
+        valor_max (int): Valor máximo en oscuridad (por defecto 65536)
+
+    Returns:
+        float: Porcentaje de luz (0.0 a 100.0)
+    """
+    # Asegurar que el valor esté dentro del rango esperado
+    valor_limitado = max(valor_min, min(valor_adc, valor_max))
+    
+    # Convertir a porcentaje INVERSO (valor alto = poca luz = 0%, valor bajo = mucha luz = 100%)
+    porcentaje = ((valor_max - valor_limitado) / (valor_max - valor_min)) * 100
+    return round(porcentaje, 1)
 
 while True:
     ## Estado 0: Espera potenciómetro > 1100, todo apagado
@@ -148,7 +182,7 @@ while True:
         if (pot_value)>1100:
             break
         display_number(0)
-        print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
+        print(f"Pot: {angulo_potenciometro(pot_value)}, LDR: {intensidad_fotorresistor(ldr_value)}, Inclinación: {led.value}")
         publish()
         if usb_cdc.console.in_waiting > 0:
             print("El sistema está apagado, gire el potenciómetro para programar la temporización")
@@ -185,6 +219,6 @@ while True:
             
         else:
             laser.duty_cycle = 0
-        print(f"Pot: {pot_value}, LDR: {ldr_value}, Inclinación: {led.value}")
+        print(f"Pot: {angulo_potenciometro(pot_value)}, LDR: {intensidad_fotorresistor(ldr_value)}, Inclinación: {led.value}")
         publish()
         time.sleep(0.5)
