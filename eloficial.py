@@ -77,7 +77,7 @@ pool = socketpool.SocketPool(wifi.radio)
 
 def connect(client, userdata, flags, rc):
     print("Conectado al broker MQTT")
-    client.publish(DESCOVERY_TOPIC, json.dumps({"equipo":NOMBRE_EQUIPO,"magnitudes": ["posición", "inclinación"]}))
+    client.publish(DESCOVERY_TOPIC, json.dumps({"equipo":NOMBRE_EQUIPO,"magnitudes": ["posicion", "inclinacion", "porcentaje de luz"]}))
 
 mqtt_client = MQTT.MQTT(
     broker=BROKER,
@@ -89,19 +89,20 @@ mqtt_client.on_connect = connect
 mqtt_client.connect()
 
 # Usamos estas varaibles globales para controlar cada cuanto publicamos
-LAST_PUB = 0
+last_pub = 0
 PUB_INTERVAL = 5  
 def publish():
-    global last_pub,pot_value,inclinado
+    global last_pub,elangulo,elporcentaje,inclinado
     now = time.monotonic()
    
     if now - last_pub >= PUB_INTERVAL:
         try:
-            pos_topic = f"{TOPIC}/posición" 
-            mqtt_client.publish(pos_topic, str(pot_value))
-            inclina_topic = f"{TOPIC}/inclinación" 
+            pos_topic = f"{TOPIC}/posicion" 
+            mqtt_client.publish(pos_topic, str(elangulo))
+            inclina_topic = f"{TOPIC}/inclinacion" 
             mqtt_client.publish(inclina_topic, str(inclinado))
-            
+            luz_topic = f"{TOPIC}/porcentaje de luz"
+            mqtt_client.publish(luz_topic, str(elporcentaje))
             last_pub = now
           
         except Exception as e:
@@ -124,17 +125,17 @@ def vertemporizador():#Todo esto del diccionario lo hice para hacer una especie 
         if msg.isdigit():
             paratemp["bandera"] = True
             display_number(3)
-            paratemp["temporizador"] =2*(int(msg))
+            paratemp["temporizador"] =2*(int(msg)) # 2 porque cada ciclo es 0.5s y la entrada es en segundos
             paratemp["contador"] = 0
         else:
             print("entrada no válida")
     if paratemp["bandera"]:
         paratemp["contador"] += 1
-        print(paratemp["contador"]) # 2 porque cada ciclo es 0.5s y la entrada es en segundos
+        print(paratemp["contador"]) 
         if paratemp["contador"] >= paratemp["temporizador"]:
             paratemp["bandera"] = False
 
-def angulo_potenciometro(valor_adc):
+def angulo_potenciometro(valor_adc, valor_min=0, valor_max=65535):
     """
     Convierte el valor ADC del potenciómetro a ángulos (0-180 grados)
     
@@ -142,32 +143,33 @@ def angulo_potenciometro(valor_adc):
         valor_adc (int): Valor ADC del potenciómetro (0 a 65535)
     
     Returns:
-        float: Ángulo en grados (0.0 a 180.0)
+        float: Ángulo en grados (0° a 180°)
     """
-    # Normalizar el valor de 0-65535 a 0-360 grados
-    angulo = (valor_adc / 65535) * 180
-    return round(angulo, 1)
+    # Normalizar el valor de mínimo-máximo a 0-180 grados
+    valor_limitado = max(valor_min, min(valor_adc, valor_max))
+    angulo = (valor_limitado-valor_min) / (valor_max-valor_min) * 180
+    return round(angulo)
 
-def intensidad_fotorresistor(valor_adc, valor_min=0, valor_max=65536):
+def intensidad_fotorresistor(valor_adc, valor_min=0, valor_max=65535):
     """
-    Convierte el valor ADC del fotoresistor KY-018 a porcentaje de luz
+    Convierte el valor ADC del fotorresistor KY-018 a porcentaje de luz
     
-    NOTA: El fotoresistor disminuye su valor cuando recibe más luz
+    NOTA: El fotorresistor disminuye su valor cuando recibe más luz
     
     Args:
-        valor_adc (int): Valor ADC del fotoresistor (0 a 65535)
+        valor_adc (int): Valor ADC del fotorresistor (0 a 65535)
         valor_min (int): Valor mínimo con mucha luz (por defecto 0)
         valor_max (int): Valor máximo en oscuridad (por defecto 65536)
 
     Returns:
-        float: Porcentaje de luz (0.0 a 100.0)
+        float: Porcentaje de luz (0% a 100%)
     """
     # Asegurar que el valor esté dentro del rango esperado
     valor_limitado = max(valor_min, min(valor_adc, valor_max))
     
     # Convertir a porcentaje INVERSO (valor alto = poca luz = 0%, valor bajo = mucha luz = 100%)
     porcentaje = ((valor_max - valor_limitado) / (valor_max - valor_min)) * 100
-    return round(porcentaje, 1)
+    return round(porcentaje)
 
 while True:
     ## Estado 0: Espera potenciómetro > 1100, todo apagado
@@ -182,7 +184,9 @@ while True:
         if (pot_value)>1100:
             break
         display_number(0)
-        print(f"Pot: {angulo_potenciometro(pot_value)}, LDR: {intensidad_fotorresistor(ldr_value)}, Inclinación: {led.value}")
+        elangulo= angulo_potenciometro(pot_value,800,63500)
+        elporcentaje=intensidad_fotorresistor(ldr_value,0,2000)
+        print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
         publish()
         if usb_cdc.console.in_waiting > 0:
             print("El sistema está apagado, gire el potenciómetro para programar la temporización")
@@ -190,6 +194,7 @@ while True:
         
     while True:
         pot_value = read_analog(pot)
+        print (pot_value)
         if not sensor.value:  # sensor activado
             led.value = True
         else:
@@ -211,14 +216,15 @@ while True:
                 display_number(2)
                 for n in range (5):
                     beep(440, 0.5)
-                    print("je")
-                    
+                    print("alarma activada")        
             else:
                 display_number(1)
                 
             
         else:
             laser.duty_cycle = 0
-        print(f"Pot: {angulo_potenciometro(pot_value)}, LDR: {intensidad_fotorresistor(ldr_value)}, Inclinación: {led.value}")
+        elangulo= angulo_potenciometro(pot_value,800,63500)
+        elporcentaje=intensidad_fotorresistor(ldr_value,0,2000)
+        print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
         publish()
         time.sleep(0.5)
