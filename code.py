@@ -11,8 +11,8 @@ import json
 led = digitalio.DigitalInOut(board.GP6)
 led.direction = digitalio.Direction.OUTPUT
 
-# Sensor (tilt switch) en GP11
-sensor = digitalio.DigitalInOut(board.GP11)
+# Sensor (tilt switch) en GP7
+sensor = digitalio.DigitalInOut(board.GP7)
 sensor.direction = digitalio.Direction.INPUT
 sensor.pull = digitalio.Pull.UP
 
@@ -55,9 +55,9 @@ paratemp={"bandera":False,"temporizador":0,"contador":0}
 
 
 # Configuración de RED
-SSID = "El wifi"
-PASSWORD = "Contraseña del wifi"
-BROKER = "La IPv4 de la pc donde corre mosquitto"  
+SSID = "el nombre del WiFi"
+PASSWORD = "La contraseña del WiFi"
+BROKER = "IPv4 del broker MQTT"
 NOMBRE_EQUIPO = "Actuadores"
 DESCOVERY_TOPIC = "descubrir"
 TOPIC = f"sensores/{NOMBRE_EQUIPO}"
@@ -131,7 +131,7 @@ def vertemporizador():#Todo esto del diccionario lo hice para hacer una especie 
             print("entrada no válida")
     if paratemp["bandera"]:
         paratemp["contador"] += 1
-        print(paratemp["contador"]) 
+        print("temporizador en curso") 
         if paratemp["contador"] >= paratemp["temporizador"]:
             paratemp["bandera"] = False
 
@@ -177,11 +177,11 @@ while True:
         pot_value = read_analog(pot)
         ldr_value = read_analog(ldr)
         if not sensor.value:  # sensor activado
-            led.value = True
-        else:
             led.value = False
+        else:
+            led.value = True
         inclinado=led.value
-        if (pot_value)>1950:
+        if (pot_value)>1950 or inclinado:
             break
         display_number(0)
         elangulo= angulo_potenciometro(pot_value,1800,62100)
@@ -189,41 +189,45 @@ while True:
         print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
         publish()
         laser.duty_cycle = 0
-        if usb_cdc.console.in_waiting > 0:
-            print("El sistema está apagado, gire el potenciómetro para programar la temporización")
+        while usb_cdc.console.in_waiting > 0:
+            usb_cdc.console.read(usb_cdc.console.in_waiting)
+            print("El sistema está apagado, gire el potenciómetro para programar la temporización")   
         time.sleep(0.5)
         
     while True:
         pot_value = read_analog(pot)
-        print (pot_value)
         if not sensor.value:  # sensor activado
-            led.value = True
-        else:
             led.value = False
-        inclinado=led.value
-        if (pot_value)<1950:
-            break
-        vertemporizador()
-        
-        if not paratemp["bandera"]:
-            
-            # Ajustamos el duty_cycle según potenciómetro y LDR
-            # LDR alto (mucha luz) reduce intensidad del láser
-            duty = int(pot_value)
-            laser.duty_cycle = duty
-            time.sleep(0.1)  # Pequeña pausa para estabilizar lectura
-            ldr_value = read_analog(ldr)
-            if (ldr_value)>200:
-                display_number(2)
-                for n in range (5):
-                    beep(440, 0.5)
-                    print("alarma activada")        
-            else:
-                display_number(1)
-                
-            
         else:
-            laser.duty_cycle = 0
+            led.value = True
+        inclinado=led.value
+        if not inclinado:
+            if (pot_value)<1950:
+                break
+            vertemporizador()
+            if not paratemp["bandera"]:
+                # Ajustamos el duty_cycle según potenciómetro y LDR
+                # LDR alto (mucha luz) reduce intensidad del láser
+                duty = int(pot_value)
+                laser.duty_cycle = duty
+                time.sleep(0.1)  # Pequeña pausa para estabilizar lectura
+                ldr_value = read_analog(ldr)
+                if (ldr_value)>200:
+                    display_number(2)
+                    for n in range (5):
+                        beep(440, 0.5)
+                        print("alarma activada por láser")        
+                else:
+                    display_number(1)
+            else:
+                laser.duty_cycle = 0
+        else:
+            display_number(4)
+            for n in range (5):
+                beep(500, 0.2)
+                print("alarma activada por forcejeo") 
+            if paratemp["bandera"]:
+                paratemp["contador"]+=2 # para que siga el conteo del temporizador mientras está inclinado el sensor 
         elangulo= angulo_potenciometro(pot_value,1800,62100)
         elporcentaje=intensidad_fotorresistor(ldr_value,0,2000)
         print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
