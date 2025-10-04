@@ -55,9 +55,9 @@ paratemp={"bandera":False,"temporizador":0,"contador":0}
 
 
 # Configuración de RED
-SSID = "Tu wifi"
-PASSWORD = "Contraseña de tu wifi"
-BROKER = "La IPv4 de la pc donde corre mosquitto. Win: ipconfig o Linux: ip addr"  
+SSID = "El wifi"
+PASSWORD = "Contraseña del wifi"
+BROKER = "La IPv4 de la pc donde corre mosquitto"  
 NOMBRE_EQUIPO = "Actuadores"
 DESCOVERY_TOPIC = "descubrir"
 TOPIC = f"sensores/{NOMBRE_EQUIPO}"
@@ -181,13 +181,14 @@ while True:
         else:
             led.value = False
         inclinado=led.value
-        if (pot_value)>1100:
+        if (pot_value)>1950:
             break
         display_number(0)
-        elangulo= angulo_potenciometro(pot_value,800,63500)
+        elangulo= angulo_potenciometro(pot_value,1800,62100)
         elporcentaje=intensidad_fotorresistor(ldr_value,0,2000)
         print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
         publish()
+        laser.duty_cycle = 0
         if usb_cdc.console.in_waiting > 0:
             print("El sistema está apagado, gire el potenciómetro para programar la temporización")
         time.sleep(0.5)
@@ -200,7 +201,7 @@ while True:
         else:
             led.value = False
         inclinado=led.value
-        if (pot_value)<1100:
+        if (pot_value)<1950:
             break
         vertemporizador()
         
@@ -212,7 +213,7 @@ while True:
             laser.duty_cycle = duty
             time.sleep(0.1)  # Pequeña pausa para estabilizar lectura
             ldr_value = read_analog(ldr)
-            if (ldr_value)>150:
+            if (ldr_value)>200:
                 display_number(2)
                 for n in range (5):
                     beep(440, 0.5)
@@ -223,7 +224,7 @@ while True:
             
         else:
             laser.duty_cycle = 0
-        elangulo= angulo_potenciometro(pot_value,800,63500)
+        elangulo= angulo_potenciometro(pot_value,1800,62100)
         elporcentaje=intensidad_fotorresistor(ldr_value,0,2000)
         print(f"ángulo potenciómetro: {elangulo}°, porcentaje de luz: {elporcentaje} %, Inclinado: {inclinado}")
         publish()

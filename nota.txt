@@ -1,1 +1,0 @@
-siempre el código que se mande al Pi Pico 2 W debe nombrarse como code.py
