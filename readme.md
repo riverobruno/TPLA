@@ -1,10 +1,10 @@
 # Primer laboratorio de la cátedra Tecnologías para la Automatización
 ##### integrantes:
--Bianciotto, Joaquín
+-Bianciotto, Joaquín.
 
--Honnorat, Valentino
+-Honnorat, Valentino.
 
--Marain, Yoel Mario
+-Marain, Yoel Mario.
 
 -Rivero, Bruno Sebastián.
 

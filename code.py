@@ -181,7 +181,7 @@ while True:
         else:
             led.value = True
         inclinado=led.value
-        if (pot_value)>1950 or inclinado:
+        if (pot_value)>2050 or inclinado:
             break
         display_number(0)
         elangulo= angulo_potenciometro(pot_value,1800,62100)
@@ -202,7 +202,7 @@ while True:
             led.value = True
         inclinado=led.value
         if not inclinado:
-            if (pot_value)<1950:
+            if (pot_value)<2050:
                 break
             vertemporizador()
             if not paratemp["bandera"]:
