@@ -212,7 +212,7 @@ while True:
                 laser.duty_cycle = duty
                 time.sleep(0.1)  # Pequeña pausa para estabilizar lectura
                 ldr_value = read_analog(ldr)
-                if (ldr_value)>200:
+                if (ldr_value)>700:
                     display_number(2)
                     for n in range (5):
                         beep(440, 0.5)
